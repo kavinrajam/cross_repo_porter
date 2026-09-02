@@ -1,0 +1,32 @@
+[project]
+name = "cross-repo-porter"
+version = "1.0.0"
+description = "Cherry-pick commits across Git repositories with different directory structures using configurable path transformation"
+readme = "README.md"
+requires-python = ">=3.7"
+dependencies = [
+    "GitPython==3.1.46",
+    "gitdb==4.0.12",
+    "requests==2.32.5",
+    "urllib3==2.6.3"
+]
+authors = [
+    {name = "Kavin Raj A M"},
+    {name = "Saiprasanna Boyina"},
+    {name = "Vikranth Nagaraj"}
+]
+
+[project.scripts]
+porter = "cross_repo_porter.main:main"
+
+[project.urls]
+Repository = "https://github.com/YOUR_GITHUB_USERNAME/cross-repo-porter"
+Documentation = "https://github.com/YOUR_GITHUB_USERNAME/cross-repo-porter/blob/main/README.md"
+
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["cross_repo_porter*"]
