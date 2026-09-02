@@ -11,9 +11,9 @@ dependencies = [
     "urllib3==2.6.3"
 ]
 authors = [
-    {name = "Kavin Raj A M"},
-    {name = "Saiprasanna Boyina"},
-    {name = "Vikranth Nagaraj"}
+    {name = "Kavin Raj A M", email = "kavinrajam@github"},
+    {name = "Saiprasanna Boyina", email = "saiprasanna-16@github"},
+    {name = "Vikranth Nagaraj", email = "vikranthnagaraj@github"}
 ]
 
 [project.scripts]

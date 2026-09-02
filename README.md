@@ -286,9 +286,9 @@ cp ~/.cross-repo-porter/.cherry-pick-state.backup.json \
 
 ## 👥 Authors
 
-- Kavin Raj A M
-- Saiprasanna Boyina
-- Vikranth Nagaraj
+- [Kavin Raj A M](https://github.com/kavinrajam)
+- [Saiprasanna Boyina](https://github.com/saiprasanna-16)
+- [Vikranth Nagaraj](https://github.com/vikranthnagaraj)
 
 ## 📄 License
 
