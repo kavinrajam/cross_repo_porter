@@ -84,18 +84,21 @@ class GitRepository:
         branch.checkout()
         self.logger.info(f"Checked out branch: {branch_name}")
     
-    def create_branch(self, branch_name: str, start_point: Optional[str] = None) -> None:
+    def create_branch(self, branch_name: str, start_point: Optional[str] = None, track: bool = False) -> None:
         """
         Create a new branch.
         
         Args:
             branch_name: Name of new branch
             start_point: Starting point (branch/commit), defaults to HEAD
+            track: Set up tracking to the start_point (if it is a remote or tracking branch)
         """
         if self.branch_exists(branch_name):
             raise ValueError(f"Branch {branch_name} already exists")
         
-        if start_point:
+        if track and start_point:
+            self.repo.git.branch('--track', branch_name, start_point)
+        elif start_point:
             self.repo.create_head(branch_name, start_point)
         else:
             self.repo.create_head(branch_name)
@@ -221,10 +224,12 @@ class GitRepository:
             env['GIT_AUTHOR_DATE'] = date
             env['GIT_COMMITTER_DATE'] = date
         
+        # Use git CLI directly with environment variables for reliable author & date handling
         if env:
-            commit = self.repo.index.commit(message, author_date=date, commit_date=date)
+            self.repo.git.commit('-m', message, env=env)
         else:
-            commit = self.repo.index.commit(message)
+            self.repo.git.commit('-m', message)
+        commit = self.repo.head.commit
         
         self.logger.info(f"Created commit: {commit.hexsha[:7]}")
         return commit.hexsha

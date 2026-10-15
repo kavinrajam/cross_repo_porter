@@ -9,8 +9,8 @@ import sys
 from argparse import ArgumentParser, RawTextHelpFormatter
 from pathlib import Path
 
-from cross_repo_porter.config import ConfigManager
-from cross_repo_porter.constants import CONFIG_DIR
+from config import ConfigManager
+from constants import CONFIG_DIR
 
 
 def _create_arg_parser():
@@ -209,7 +209,7 @@ def handle_config_command(args):
 
 def handle_status_command():
     """Handle status command."""
-    from cross_repo_porter.state import StateManager
+    from state import StateManager
 
     state_manager = StateManager()
     state = state_manager.load()
@@ -239,10 +239,10 @@ def handle_status_command():
 
 def handle_cherry_pick_command(args, log_dir, timestamp):
     """Handle cherry-pick command."""
-    from cross_repo_porter.cherry_picker import CherryPicker, ConflictError
-    from cross_repo_porter.repository import RepositoryPair
-    from cross_repo_porter.path_transformer import create_transformer_from_config
-    from cross_repo_porter.state import StateManager, create_initial_state
+    from cherry_picker import CherryPicker, ConflictError
+    from repository import RepositoryPair
+    from path_transformer import create_transformer_from_config
+    from state import StateManager, create_initial_state
 
     logger = logging.getLogger(__name__)
     config = ConfigManager(initial=True)
@@ -360,6 +360,25 @@ def handle_cherry_pick_command(args, log_dir, timestamp):
             sys.exit(1)
         print("✓ Repositories validated")
 
+        print(f"🔄 Pulling latest changes for base branches...")
+        try:
+            # Pull source base branch
+            repo_pair.source.checkout_branch(base_source)
+            repo_pair.source.pull(branch=base_source)
+            print(f"✓ Pulled latest '{base_source}' in source repository")
+        except Exception as e:
+            logger.warning(f"Could not pull latest '{base_source}' in source repository: {e}")
+            print(f"⚠️  Could not pull latest '{base_source}' in source repository: {e}")
+
+        try:
+            # Pull target base branch
+            repo_pair.target.checkout_branch(base_target)
+            repo_pair.target.pull(branch=base_target)
+            print(f"✓ Pulled latest '{base_target}' in target repository")
+        except Exception as e:
+            logger.warning(f"Could not pull latest '{base_target}' in target repository: {e}")
+            print(f"⚠️  Could not pull latest '{base_target}' in target repository: {e}")
+
         print(f"📋 Finding commits in '{args.branch}' not in '{base_source}'...")
         commits = repo_pair.source.get_commits_not_in_base(args.branch, base_source)
 
@@ -386,10 +405,22 @@ def handle_cherry_pick_command(args, log_dir, timestamp):
             print("Aborted by user")
             return
 
-        print(f"\n🌿 Creating branch '{target_branch}' from '{base_target}'...")
-        repo_pair.target.checkout_branch(base_target)
-        repo_pair.target.create_branch(target_branch)
-        repo_pair.target.checkout_branch(target_branch)
+        if repo_pair.target.branch_exists(target_branch):
+            branch_resp = input(f"\n⚠️  Branch '{target_branch}' already exists in target repository. Use existing branch? [y/N]: ").strip().lower()
+            if branch_resp not in ['y', 'yes']:
+                print("Aborted by user")
+                return
+            print(f"🌿 Checking out existing branch '{target_branch}'...")
+            repo_pair.target.checkout_branch(target_branch)
+        else:
+            print(f"\n🌿 Creating branch '{target_branch}' tracking 'origin/{base_target}'...")
+            repo_pair.target.checkout_branch(base_target)
+            # Check if origin/<base_target> exists to track, otherwise fall back to local base_target
+            origin_ref = f"origin/{base_target}"
+            remote_refs = [r.name for r in repo_pair.target.repo.remotes.origin.refs] if 'origin' in repo_pair.target.repo.remotes else []
+            start_point = origin_ref if origin_ref in remote_refs else base_target
+            repo_pair.target.create_branch(target_branch, start_point=start_point, track=True)
+            repo_pair.target.checkout_branch(target_branch)
 
         commit_shas = [c.sha for c in commits]
         state = create_initial_state(

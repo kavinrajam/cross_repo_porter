@@ -109,13 +109,34 @@ class PatchTransformer:
         modified_paths = []
 
         for i, line in enumerate(lines):
+            # Transform paths in git diff header: diff --git a/... b/...
+            if line.startswith('diff --git a/'):
+                match = re.match(r'^diff --git a/(.*) b/(.*)$', line)
+                if match:
+                    path_a, path_b = match.group(1), match.group(2)
+                    transformed_a, was_a = self.path_transformer.transform_path(path_a)
+                    transformed_b, was_b = self.path_transformer.transform_path(path_b)
+                    if was_a or was_b:
+                        lines[i] = f"diff --git a/{transformed_a} b/{transformed_b}"
+                        if was_a and path_a not in modified_paths:
+                            modified_paths.append(path_a)
+                        if was_b and path_b not in modified_paths:
+                            modified_paths.append(path_b)
+
             # Transform paths in diff headers
-            if line.startswith('--- a/') or line.startswith('+++ b/'):
-                prefix = line[:6]
+            elif line.startswith('--- a/'):
                 path = line[6:]
                 transformed, was_transformed = self.path_transformer.transform_path(path)
                 if was_transformed:
-                    lines[i] = prefix + transformed
+                    lines[i] = '--- a/' + transformed
+                    if path not in modified_paths:
+                        modified_paths.append(path)
+
+            elif line.startswith('+++ b/'):
+                path = line[6:]
+                transformed, was_transformed = self.path_transformer.transform_path(path)
+                if was_transformed:
+                    lines[i] = '+++ b/' + transformed
                     if path not in modified_paths:
                         modified_paths.append(path)
 

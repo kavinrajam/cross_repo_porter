@@ -3,15 +3,16 @@ Core cherry-pick logic for syncing commits between repositories.
 Similar to git cherry-pick but with path transformation support.
 """
 
+import re
 import subprocess
 import tempfile
 from pathlib import Path
 from typing import List, Optional, Tuple
 import logging
 
-from cross_repo_porter.repository import GitRepository, RepositoryPair, CommitInfo
-from cross_repo_porter.path_transformer import PathTransformer, PatchTransformer
-from cross_repo_porter.state import CherryPickState, StateManager
+from repository import GitRepository, RepositoryPair, CommitInfo
+from path_transformer import PathTransformer, PatchTransformer
+from state import CherryPickState, StateManager
 
 
 class CherryPickError(Exception):
@@ -102,6 +103,11 @@ class CherryPicker:
                         conflicted
                     )
                 return False, error
+
+            # Check if applying the patch resulted in any staged or unstaged changes
+            if not self.repos.target.repo.is_dirty(index=True, working_tree=True, untracked_files=False):
+                self.logger.info(f"Commit {commit_sha[:7]} produced no changes (empty commit or already applied). Skipping commit creation.")
+                return True, None
             
             # Create commit with original metadata
             if preserve_author:
@@ -161,12 +167,47 @@ class CherryPicker:
         
         if result.returncode == 0:
             return True, None
+
+        # Fallback for deleted files where local file content has slightly diverged
+        if "error: removal patch leaves file contents" in result.stderr.lower() or "deleted file mode" in patch_path.read_text():
+            deleted_files = self._get_deleted_files_from_patch(patch_path)
+            if deleted_files:
+                deleted_all = True
+                for f in deleted_files:
+                    target_file = Path(self.repos.target.path) / f
+                    if target_file.exists():
+                        try:
+                            self.repos.target.repo.git.rm('-f', f)
+                        except Exception as e:
+                            self.logger.warning(f"Could not git rm {f}: {e}")
+                            deleted_all = False
+                if deleted_all:
+                    return True, None
         
         # Check if it's a conflict or other error
         if "conflict" in result.stderr.lower() or "conflict" in result.stdout.lower():
             return False, "Conflicts detected"
         
         return False, result.stderr or result.stdout
+
+    def _get_deleted_files_from_patch(self, patch_path: Path) -> List[str]:
+        """Extract deleted target file paths from patch."""
+        deleted = []
+        lines = patch_path.read_text().split('\n')
+        current_file = None
+        is_deleted = False
+
+        for line in lines:
+            if line.startswith('diff --git a/'):
+                match = re.match(r'^diff --git a/(.*) b/(.*)$', line)
+                if match:
+                    current_file = match.group(2)
+                    is_deleted = False
+            elif line.startswith('deleted file mode'):
+                is_deleted = True
+            elif line.startswith('--- a/') and is_deleted and current_file:
+                deleted.append(current_file)
+        return deleted
     
     def cherry_pick_range(
         self,

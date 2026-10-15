@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import List, Optional, Dict, Any
 from dataclasses import dataclass, asdict, field
 
-from cross_repo_porter.constants import CONFIG_DIR
+from constants import CONFIG_DIR
 
 
 STATE_FILE = CONFIG_DIR / ".cherry-pick-state.json"

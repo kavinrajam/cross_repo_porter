@@ -6,7 +6,7 @@ Stores repository paths, default branches, and path mappings.
 import json
 from typing import Dict, Optional
 
-from cross_repo_porter.constants import (
+from constants import (
     CONFIG_DIR,
     SOURCE_REPO_PATH,
     TARGET_REPO_PATH,
